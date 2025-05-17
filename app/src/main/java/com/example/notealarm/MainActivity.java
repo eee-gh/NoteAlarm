@@ -4,6 +4,8 @@ import android.annotation.SuppressLint;
 import android.app.AlarmManager;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
+import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.TimePickerDialog;
 import android.content.Context;
@@ -17,6 +19,7 @@ import android.widget.TimePicker;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.NotificationCompat;
 
 import java.sql.Time;
 import java.time.Duration;
@@ -72,7 +75,12 @@ public class MainActivity extends AppCompatActivity {
                     AlarmManager manager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
                     AlarmManager.AlarmClockInfo alarmClockInfo = new AlarmManager.AlarmClockInfo(time, getAlarmInfo());
 
-                    manager.setAlarmClock(alarmClockInfo, getAlarmAction());
+                    //manager.setAlarmClock(alarmClockInfo, getAlarmAction());
+
+//                    PendingIntent pi = PendingIntent.getBroadcast();
+//
+//                    manager.set(AlarmManager.RTC_WAKEUP, time, getAlarmAction());
+
 
                     dialog.cancel();
                     Toast.makeText(getApplicationContext(), "Напоминание установлено", Toast.LENGTH_SHORT).show();
@@ -121,6 +129,22 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(this, AlarmActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
         return PendingIntent.getActivity(this, 1, intent, PendingIntent.FLAG_MUTABLE);
+    }
+
+
+    public void setOnetimeTimer(Context context) {
+        AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        Intent intent = new Intent(context, MainActivity.class);
+        intent.putExtra("onetime", Boolean.TRUE);
+        PendingIntent pi = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_MUTABLE);
+        am.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), pi);
+    }
+
+    public void CancelAlarm(Context context) {
+        Intent intent = new Intent(context, MainActivity.class);
+        PendingIntent sender = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_MUTABLE);
+        AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        alarmManager.cancel(sender);
     }
 
 
