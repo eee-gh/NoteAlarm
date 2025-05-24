@@ -1,5 +1,7 @@
 package com.example.notealarm;
 
+import static androidx.core.app.AlarmManagerCompat.canScheduleExactAlarms;
+
 import android.annotation.SuppressLint;
 import android.app.AlarmManager;
 import android.app.DatePickerDialog;
@@ -11,6 +13,7 @@ import android.app.TimePickerDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.provider.AlarmClock;
 import android.view.View;
 import android.widget.Button;
 import android.widget.DatePicker;
@@ -73,13 +76,18 @@ public class MainActivity extends AppCompatActivity {
                     long time = dateEnd.getTimeInMillis();
 
                     AlarmManager manager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-                    AlarmManager.AlarmClockInfo alarmClockInfo = new AlarmManager.AlarmClockInfo(time, getAlarmInfo());
 
-                    //manager.setAlarmClock(alarmClockInfo, getAlarmAction());
+                    Intent i = new Intent(AlarmClock.ACTION_SET_ALARM);
+                    i.putExtra(AlarmClock.EXTRA_MESSAGE, "New Alarm");
+                    i.putExtra(AlarmClock.EXTRA_SKIP_UI, true);
 
-//                    PendingIntent pi = PendingIntent.getBroadcast();
-//
-//                    manager.set(AlarmManager.RTC_WAKEUP, time, getAlarmAction());
+
+                    PendingIntent pendingIntent = PendingIntent.getActivity(getApplicationContext(), 1, i, PendingIntent.FLAG_IMMUTABLE);
+                    manager.setAlarmClock(new AlarmManager.AlarmClockInfo(time, pendingIntent), pendingIntent);
+
+//                    AlarmManager.AlarmClockInfo alarmClockInfo = new AlarmManager.AlarmClockInfo(time, getAlarmInfo());
+
+
 
 
                     dialog.cancel();
@@ -132,7 +140,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    public void setOnetimeTimer(Context context) {
+    public void setAlarm(Context context) {
         AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         Intent intent = new Intent(context, MainActivity.class);
         intent.putExtra("onetime", Boolean.TRUE);
