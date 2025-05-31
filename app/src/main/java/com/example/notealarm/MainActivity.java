@@ -7,6 +7,7 @@ import android.app.AlarmManager;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
 import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.TimePickerDialog;
@@ -23,6 +24,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 
 import java.sql.Time;
 import java.time.Duration;
@@ -76,18 +78,11 @@ public class MainActivity extends AppCompatActivity {
                     long time = dateEnd.getTimeInMillis();
 
                     AlarmManager manager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+                    Intent intent = new Intent(MainActivity.this, AlarmReceiver.class);
+                    PendingIntent pendingIntent = PendingIntent.getBroadcast(MainActivity.this, 0, intent, PendingIntent.FLAG_MUTABLE);
 
-                    Intent i = new Intent(AlarmClock.ACTION_SET_ALARM);
-                    i.putExtra(AlarmClock.EXTRA_MESSAGE, "New Alarm");
-                    i.putExtra(AlarmClock.EXTRA_SKIP_UI, true);
-
-
-                    PendingIntent pendingIntent = PendingIntent.getActivity(getApplicationContext(), 1, i, PendingIntent.FLAG_IMMUTABLE);
-                    manager.setAlarmClock(new AlarmManager.AlarmClockInfo(time, pendingIntent), pendingIntent);
-
-//                    AlarmManager.AlarmClockInfo alarmClockInfo = new AlarmManager.AlarmClockInfo(time, getAlarmInfo());
-
-
+                    AlarmManager.AlarmClockInfo info = new AlarmManager.AlarmClockInfo(time, pendingIntent);
+                    manager.setAlarmClock(info, pendingIntent);
 
 
                     dialog.cancel();
@@ -140,19 +135,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    public void setAlarm(Context context) {
-        AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        Intent intent = new Intent(context, MainActivity.class);
-        intent.putExtra("onetime", Boolean.TRUE);
-        PendingIntent pi = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_MUTABLE);
-        am.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), pi);
-    }
+    void createNotificationChannel() {
 
-    public void CancelAlarm(Context context) {
-        Intent intent = new Intent(context, MainActivity.class);
-        PendingIntent sender = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_MUTABLE);
-        AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        alarmManager.cancel(sender);
+        NotificationChannel channel = new NotificationChannel("notealarm", "cn", NotificationManager.IMPORTANCE_HIGH);
+        channel.setDescription("test");
+
+        NotificationManager notificationManager = getSystemService(NotificationManager.class);
+        notificationManager.createNotificationChannel(channel);
+
     }
 
 
@@ -160,6 +150,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        createNotificationChannel();
 
         plus = findViewById(R.id.plus_button);
         plus.setOnClickListener(new View.OnClickListener() {

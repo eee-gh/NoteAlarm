@@ -1,47 +1,52 @@
 package com.example.notealarm;
 
-import android.annotation.SuppressLint;
-import android.app.AlarmManager;
+
+import android.app.Notification;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Bundle;
-import android.os.PowerManager;
-import android.util.Log;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
+import android.net.Uri;
+
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
+
 
 public class AlarmReceiver extends BroadcastReceiver {
 
-    final public static String ONE_TIME = "onetime";
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-        @SuppressLint("InvalidWakeLockTag")
-        PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TAG");
+        Intent nextActivity = new Intent(context, AlarmActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, nextActivity, PendingIntent.FLAG_MUTABLE);
 
-        wl.acquire(10 * 60 * 1000L /*10 minutes*/);
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "notealarm")
+                .setSmallIcon(R.drawable.roundedbutton)
+                .setContentTitle("Напоминание")
+                .setContentText("Нажмите чтобы посмотреть")
+                .setAutoCancel(true)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(pendingIntent)
+                .setSound(getUri(context));
 
+        NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(context);
+        try {
+            notificationManagerCompat.notify(123, builder.build());
+        } catch (SecurityException e) {
+            throw new RuntimeException(e);
+        }
 
-        Bundle extras = intent.getExtras();
-        StringBuilder msgStr = new StringBuilder();
-
-
-        wl.release();
     }
 
-    public void setAlarm(Context context) {
-        AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        Intent intent = new Intent(context, MainActivity.class);
-        intent.putExtra("onetime", Boolean.TRUE);
-        PendingIntent pi = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_MUTABLE);
-        am.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), pi);
-    }
-
-    public void CancelAlarm(Context context) {
-        Intent intent = new Intent(context, MainActivity.class);
-        PendingIntent sender = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_MUTABLE);
-        AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        alarmManager.cancel(sender);
+    Uri getUri(Context context) {
+        Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+        if (notification == null) {
+            notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+        }
+        return notification;
     }
 }
