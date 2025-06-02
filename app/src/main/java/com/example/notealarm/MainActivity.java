@@ -1,44 +1,57 @@
 package com.example.notealarm;
 
-import static androidx.core.app.AlarmManagerCompat.canScheduleExactAlarms;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.AlarmManager;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
-import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.TimePickerDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.media.AudioAttributes;
+import android.media.RingtoneManager;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
-import android.provider.AlarmClock;
 import android.view.View;
 import android.widget.Button;
 import android.widget.DatePicker;
+import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ListView;
 import android.widget.TimePicker;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.NotificationCompat;
-import androidx.core.app.NotificationManagerCompat;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
-import java.sql.Time;
-import java.time.Duration;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.Period;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
+import java.lang.reflect.Type;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
-import java.util.concurrent.TimeUnit;
+import java.util.Locale;
+
 
 public class MainActivity extends AppCompatActivity {
 
+    ArrayList<ListItem> alarmArray;
+    SharedPreferences alarms;
+    ListAdapter adapter;
+    ListView lv;
     ImageButton plus;
+    EditText n_text;
     Button timeSelect;
     Button create;
     int sYear;
@@ -49,9 +62,11 @@ public class MainActivity extends AppCompatActivity {
 
     void showDialog() {
         sYear = -1;
+        sMinute = -1;
         Dialog dialog = new Dialog(this);
         dialog.setContentView(R.layout.time_select);
 
+        n_text = dialog.findViewById(R.id.n_text);
 
         timeSelect = dialog.findViewById(R.id.time_choose);
         timeSelect.setOnClickListener(new View.OnClickListener() {
@@ -70,19 +85,34 @@ public class MainActivity extends AppCompatActivity {
                 GregorianCalendar dateStart = new GregorianCalendar(c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH), c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), 0);
                 GregorianCalendar dateEnd = new GregorianCalendar(sYear, sMonth, sDay, sHour, sMinute, 0);
 
-                if (sYear == -1) {
-                    Toast.makeText(getApplicationContext(), "Выберите дату и время", Toast.LENGTH_LONG).show();
+                if (n_text.getText().toString().isEmpty()) {
+                    Toast.makeText(getApplicationContext(), "Введите текст напоминания", Toast.LENGTH_SHORT).show();
+                } else if (sYear == -1) {
+                    Toast.makeText(getApplicationContext(), "Выберите дату и время", Toast.LENGTH_SHORT).show();
                 } else if (dateStart.getTimeInMillis() >= dateEnd.getTimeInMillis()) {
-                    Toast.makeText(getApplicationContext(), "Выберите корректное время", Toast.LENGTH_LONG).show();
+                    Toast.makeText(getApplicationContext(), "Выберите корректное время", Toast.LENGTH_SHORT).show();
                 } else {
                     long time = dateEnd.getTimeInMillis();
+                    String text = n_text.getText().toString();
+                    Bundle bundle = new Bundle();
+                    bundle.putString("text", text);
 
                     AlarmManager manager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
                     Intent intent = new Intent(MainActivity.this, AlarmReceiver.class);
-                    PendingIntent pendingIntent = PendingIntent.getBroadcast(MainActivity.this, 0, intent, PendingIntent.FLAG_MUTABLE);
+                    intent.putExtras(bundle);
+                    int current_time = (int) System.currentTimeMillis();
+                    PendingIntent pendingIntent = PendingIntent.getBroadcast(MainActivity.this, current_time, intent, PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
                     AlarmManager.AlarmClockInfo info = new AlarmManager.AlarmClockInfo(time, pendingIntent);
                     manager.setAlarmClock(info, pendingIntent);
+
+
+                    ListItem listItem = new ListItem(timeFormat(time), text, current_time, time);
+                    alarmArray.add(listItem);
+                    SharedPreferences.Editor prefEditor = alarms.edit();
+                    prefEditor.putString("list", serialize(alarmArray));
+                    prefEditor.apply();
+                    lv.setAdapter(adapter);
 
 
                     dialog.cancel();
@@ -115,6 +145,12 @@ public class MainActivity extends AppCompatActivity {
             public void onTimeSet(TimePicker timePicker, int hour, int minute) {
                 sHour = hour;
                 sMinute = minute;
+
+                if (sMinute != -1) {
+                    GregorianCalendar buttonDate = new GregorianCalendar(sYear, sMonth, sDay, sHour, sMinute, 0);
+                    timeSelect.setText(timeFormat(buttonDate.getTimeInMillis()));
+                }
+
             }
         };
         Calendar calendar = Calendar.getInstance();
@@ -122,36 +158,75 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
-    PendingIntent getAlarmInfo() {
-        Intent alarmInfo = new Intent(this, MainActivity.class);
-        alarmInfo.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
-        return PendingIntent.getActivity(this, 0, alarmInfo, PendingIntent.FLAG_MUTABLE);
+    public static boolean checkPermission(Context context, String permission) {
+        return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED;
     }
 
-    PendingIntent getAlarmAction() {
-        Intent intent = new Intent(this, AlarmActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
-        return PendingIntent.getActivity(this, 1, intent, PendingIntent.FLAG_MUTABLE);
+    Uri getUri() {
+        Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+        if (notification == null) {
+            notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+        }
+        return notification;
     }
-
 
     void createNotificationChannel() {
+        AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .build();
 
-        NotificationChannel channel = new NotificationChannel("notealarm", "cn", NotificationManager.IMPORTANCE_HIGH);
-        channel.setDescription("test");
+        NotificationChannel channel = new NotificationChannel("notealarm", "Уведомления", NotificationManager.IMPORTANCE_HIGH);
+        channel.enableLights(true);
+        channel.enableVibration(true);
+        channel.setSound(getUri(), audioAttributes);
+        channel.setVibrationPattern(new long[]{0, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500});
 
         NotificationManager notificationManager = getSystemService(NotificationManager.class);
         notificationManager.createNotificationChannel(channel);
-
     }
 
+    public static String serialize(ArrayList<ListItem> arr) {
+        Gson gson = new Gson();
+        return gson.toJson(arr);
+    }
+
+    public static ArrayList<ListItem> deserialize(String s) {
+        Gson gson = new Gson();
+        Type listType = new TypeToken<ArrayList<ListItem>>() {
+        }.getType();
+        return gson.fromJson(s, listType);
+    }
+
+    public static String timeFormat(long timeMills) {
+        Date date = new Date(timeMills);
+        SimpleDateFormat formater = new SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.US);
+        return formater.format(date);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            final String PERMISSION_POST_NOTIFICATIONS = Manifest.permission.POST_NOTIFICATIONS;
+            if (!checkPermission(this, PERMISSION_POST_NOTIFICATIONS)) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
+            }
+        }
         createNotificationChannel();
+        alarms = getPreferences(MODE_PRIVATE);
+        if (alarms.contains("list")) {
+            alarmArray = deserialize(alarms.getString("list", ""));
+        } else {
+            alarmArray = new ArrayList<ListItem>();
+        }
+
+
+        adapter = new ListAdapter(this, alarmArray);
+        lv = (ListView) findViewById(R.id.list_view);
+        lv.setAdapter(adapter);
 
         plus = findViewById(R.id.plus_button);
         plus.setOnClickListener(new View.OnClickListener() {
@@ -160,5 +235,29 @@ public class MainActivity extends AppCompatActivity {
                 showDialog();
             }
         });
+    }
+
+    @Override
+    protected void onStop() {
+        SharedPreferences.Editor prefEditor = alarms.edit();
+        prefEditor.putString("list", serialize(alarmArray));
+        prefEditor.apply();
+        super.onStop();
+    }
+
+    @Override
+    public void onDetachedFromWindow() {
+        SharedPreferences.Editor prefEditor = alarms.edit();
+        prefEditor.putString("list", serialize(alarmArray));
+        prefEditor.apply();
+        super.onDetachedFromWindow();
+    }
+
+    @Override
+    protected void onDestroy() {
+        SharedPreferences.Editor prefEditor = alarms.edit();
+        prefEditor.putString("list", serialize(alarmArray));
+        prefEditor.apply();
+        super.onDestroy();
     }
 }

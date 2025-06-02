@@ -9,10 +9,17 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
+        <EditText
+            android:id="@+id/n_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Текст напоминания" />
+
         <Button
             android:id="@+id/time_choose"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_below="@+id/n_text"
             android:text="Выбрать время" />
 
         <Button

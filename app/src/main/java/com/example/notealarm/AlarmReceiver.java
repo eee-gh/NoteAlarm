@@ -1,14 +1,11 @@
 package com.example.notealarm;
 
 
-import android.app.Notification;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.media.Ringtone;
-import android.media.RingtoneManager;
-import android.net.Uri;
+import android.os.Bundle;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -19,19 +16,29 @@ public class AlarmReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        Intent nextActivity = new Intent(context, AlarmActivity.class);
+        Bundle extras = intent.getExtras();
+        String n_text = "";
+        if (extras != null) {
+            n_text = extras.getString("text");
+        }
+
+        Intent nextActivity = new Intent(context, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, nextActivity, PendingIntent.FLAG_MUTABLE);
+
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "notealarm")
                 .setSmallIcon(R.drawable.roundedbutton)
                 .setContentTitle("Напоминание")
-                .setContentText("Нажмите чтобы посмотреть")
+                .setContentText(n_text)
+                .setSubText(context.getString(R.string.app_name))
                 .setAutoCancel(true)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setOngoing(true)
                 .setContentIntent(pendingIntent)
-                .setSound(getUri(context));
+                .setWhen(System.currentTimeMillis());
+
 
         NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(context);
         try {
@@ -40,13 +47,5 @@ public class AlarmReceiver extends BroadcastReceiver {
             throw new RuntimeException(e);
         }
 
-    }
-
-    Uri getUri(Context context) {
-        Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-        if (notification == null) {
-            notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
-        }
-        return notification;
     }
 }
